@@ -41,108 +41,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /*
-        @Composable
-        fun AudioRecorderApp() {
-    //         context = LocalContext.current
-            val audioFilePath = remember { mutableStateOf<String?>(null) }
-            val isRecording = remember { mutableStateOf(false) }
-            val mediaRecorder = remember { mutableStateOf<MediaRecorder?>(null) }
-            val mediaPlayer = remember { mutableStateOf<MediaPlayer?>(null) }
-            var isPlaying by remember { mutableStateOf(false) }
-
-
-            var currentProgress by remember { mutableStateOf(0f) }  // Progress bar value
-            var duration by remember { mutableStateOf(0f) }         // Total audio duration
-
-            // Handler for updating the progress bar
-            val handler = remember { Handler(Looper.getMainLooper()) }
-
-            // Requesting audio recording permission launcher
-            val permissionLauncher = rememberLauncherForActivityResult(
-                contract = ActivityResultContracts.RequestPermission(),
-                onResult = { granted ->
-                    if (!granted) {
-                        Toast.makeText(context, "Audio permission denied", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
-
-            val hasPermission = remember {
-                mutableStateOf(
-                    ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.RECORD_AUDIO
-                    ) == PackageManager.PERMISSION_GRANTED
-                )
-            }
-
-            // Request permission at the start if not granted
-            LaunchedEffect(Unit) {
-                if (!hasPermission.value) {
-                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                // Record Button
-                Button(
-                    onClick = {
-                        if (hasPermission.value) {
-                            startRecording(context, mediaRecorder, audioFilePath, handler, {
-                                recordingProgress = it / 60000f  // Assuming 60 seconds max
-                            })
-
-                            isRecording.value = true
-                        } else {
-                            Toast.makeText(context, "Permission denied", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    enabled = !isRecording.value
-                ) {
-                    Text("Start Recording")
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Stop Button
-                Button(
-                    onClick = {
-                        stopRecording(context, mediaRecorder)
-                        isRecording.value = false
-                    },
-                    enabled = isRecording.value
-                ) {
-                    Text("Stop Recording")
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Toggle Button for Play and Stop Playback
-                Button(
-                    onClick = {
-                        isPlaying = if (isPlaying) {
-                            stopPlaying(context, mediaPlayer)
-                            false
-                        } else {
-                            startPlaying(context, mediaPlayer, audioFilePath.value)
-                            true
-                        }
-                    },
-                    enabled = audioFilePath.value != null && !isRecording.value
-                ) {
-                    Text(if (isPlaying) "Stop Playing" else "Play Recording")
-                }
-            }
-
-        }*/
-
     @Composable
     fun AudioRecorderWithPlayerAndProgress() {
         val context = LocalContext.current
@@ -247,114 +145,34 @@ class MainActivity : ComponentActivity() {
             ) {
                 Text(if (isPlaying) "Stop Playing" else "Play Recording")
             }
-        }
-    }
+            Spacer(modifier = Modifier.height(16.dp))
 
-    // Function to start playing audio
-    fun startPlaying(
-        context: Context,
-        mediaPlayer: MutableState<MediaPlayer?>,
-        filePath: String?
-    ) {
-        if (filePath == null) return
-
-        mediaPlayer.value = MediaPlayer().apply {
-            try {
-                setDataSource(filePath)
-                prepare()
-                start()
-                Toast.makeText(context, "Playing audio", Toast.LENGTH_SHORT).show()
-
-                setOnCompletionListener {
-                    Toast.makeText(context, "Playback completed", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: IOException) {
-                Toast.makeText(context, "Playback failed", Toast.LENGTH_SHORT).show()
-                e.printStackTrace()
+            // Delete Button to delete the recording
+            Button(
+                onClick = {
+                    deleteRecording(audioFilePath, context)
+                    // Reset progress and states after deleting
+                    currentProgress = 0f
+                    recordingProgress = 0f
+                    duration = 0f
+                    isPlaying = false
+                    Toast.makeText(context, "Recording deleted", Toast.LENGTH_SHORT).show()
+                },
+                enabled = audioFilePath.value != null && !isRecording.value
+            ) {
+                Text("Delete Recording")
             }
         }
     }
 
-    // Function to stop playing audio
-    fun stopPlaying(context: Context, mediaPlayer: MutableState<MediaPlayer?>) {
-        mediaPlayer.value?.apply {
-            if (isPlaying) {
-                stop()
-                reset()
-                release()
-                Toast.makeText(context, "Playback stopped", Toast.LENGTH_SHORT).show()
-            }
-        }
-        mediaPlayer.value = null
-    }
-
-    /*
-fun startRecording(
-    context: Context,
-    mediaRecorder: MutableState<MediaRecorder?>,
-    audioFilePath: MutableState<String?>
-) {
-    val fileName = File(context.filesDir, "audio_record.3gp").absolutePath
-    audioFilePath.value = fileName
-
-    mediaRecorder.value = MediaRecorder().apply {
-        setAudioSource(MediaRecorder.AudioSource.MIC)
-
-        // Set output format to MPEG_4 for M4A
-        setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-
-        // Set the audio encoder to AAC for M4A
-        setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-
-        // Optionally, you can set a bitrate and sampling rate
-        setAudioEncodingBitRate(128000) // 128 kbps
-        setAudioSamplingRate(44100)     // 44.1 kHz
-        setOutputFile(fileName)
-
-        // Set max duration to 60 seconds (60,000 milliseconds)
-        setMaxDuration(60000)  // 60 seconds
-
-        // Notify the user when the time limit is reached
-        setOnInfoListener { _, what, _ ->
-            if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) {
-                Toast.makeText(
-                    context,
-                    "Recording stopped (60-second limit reached)",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-
-        try {
-            prepare()
-            start()
-            Toast.makeText(
-                context,
-                "Recording started (will stop automatically after 60 seconds)",
-                Toast.LENGTH_SHORT
-            ).show()
-        } catch (e: IOException) {
-            Toast.makeText(context, "Recording failed", Toast.LENGTH_SHORT).show()
-            e.printStackTrace()
-        }
-    }
-}
-*/
-
-    //fun stopRecording(context: Context, mediaRecorder: MutableState<MediaRecorder?>) {
-//    mediaRecorder.value?.apply {
-//        stop()
-//        release()
-//        Toast.makeText(context, "Recording stopped", Toast.LENGTH_SHORT).show()
-//    }
-//    mediaRecorder.value = null
-//}
+    // Function to start recording audio
     fun startRecording(
-        context: android.content.Context,
+        context: Context,
         mediaRecorder: MutableState<MediaRecorder?>,
         audioFilePath: MutableState<String?>,
         handler: Handler,
-        onRecordingProgress: (Float) -> Unit
+        onRecordingProgress: (Float) -> Unit,
+        onRecordingStart: (Long) -> Unit
     ) {
         val fileName = File(context.filesDir, "audio_record.m4a").absolutePath
         audioFilePath.value = fileName
@@ -373,15 +191,18 @@ fun startRecording(
                 prepare()
                 start()
 
+                val startTime = System.currentTimeMillis()
+                onRecordingStart(startTime)
+
                 // Periodically update the recording progress
                 handler.post(object : Runnable {
                     override fun run() {
-                        onRecordingProgress(System.currentTimeMillis().toFloat())
+                        onRecordingProgress((System.currentTimeMillis() - startTime).toFloat())
                         handler.postDelayed(this, 100)
                     }
                 })
 
-                Toast.makeText(context, "Recording started", Toast.LENGTH_SHORT).show()
+//                Toast.makeText(context, "Recording started", Toast.LENGTH_SHORT).show()
             } catch (e: IOException) {
                 Toast.makeText(context, "Recording failed", Toast.LENGTH_SHORT).show()
                 e.printStackTrace()
@@ -393,7 +214,7 @@ fun startRecording(
         mediaRecorder.value?.apply {
             stop()
             release()
-            Toast.makeText(context, "Recording stopped", Toast.LENGTH_SHORT).show()
+//            Toast.makeText(context, "Recording stopped", Toast.LENGTH_SHORT).show()
         }
         mediaRecorder.value = null
         handler.removeCallbacksAndMessages(null)  // Stop updating the recording progress
@@ -401,7 +222,7 @@ fun startRecording(
 
     // Function to start playing audio and update playback progress
     fun startPlaying(
-        context: android.content.Context,
+        context: Context,
         mediaPlayer: MutableState<MediaPlayer?>,
         filePath: String?,
         handler: Handler,
@@ -428,7 +249,7 @@ fun startRecording(
                     }
                 })
 
-                Toast.makeText(context, "Playing audio", Toast.LENGTH_SHORT).show()
+//                Toast.makeText(context, "Playing audio", Toast.LENGTH_SHORT).show()
 
                 setOnCompletionListener {
                     Toast.makeText(context, "Playback completed", Toast.LENGTH_SHORT).show()
@@ -454,27 +275,20 @@ fun startRecording(
         handler.removeCallbacksAndMessages(null)  // Stop updating the playback progress
     }
 
-    fun playRecording(
-        context: Context,
-        mediaPlayer: MutableState<MediaPlayer?>,
-        filePath: String?
-    ) {
-        if (filePath == null) return
-
-        mediaPlayer.value = MediaPlayer().apply {
-            try {
-                setDataSource(filePath)
-                prepare()
-                start()
-                Toast.makeText(context, "Playing audio", Toast.LENGTH_SHORT).show()
-
-                setOnCompletionListener {
-                    Toast.makeText(context, "Playback completed", Toast.LENGTH_SHORT).show()
+    // Function to delete the recording
+    fun deleteRecording(audioFilePath: MutableState<String?>, context: Context) {
+        audioFilePath.value?.let {
+            val file = File(it)
+            if (file.exists()) {
+                val deleted = file.delete()
+                if (deleted) {
+                    audioFilePath.value = null
+                    Toast.makeText(context, "Recording deleted", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Failed to delete recording", Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: IOException) {
-                Toast.makeText(context, "Playback failed", Toast.LENGTH_SHORT).show()
-                e.printStackTrace()
             }
         }
     }
+
 }
