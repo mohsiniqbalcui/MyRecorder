@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
     fun AudioRecorderWithPlayerAndProgress() {
         val context = LocalContext.current
         val audioFilePath = remember { mutableStateOf<String?>(null) }
-        val isRecording = remember { mutableStateOf(false) }
+        var isRecording by remember { mutableStateOf(false) }
         val mediaRecorder = remember { mutableStateOf<MediaRecorder?>(null) }
         val mediaPlayer = remember { mutableStateOf<MediaPlayer?>(null) }
         var isAudioPlaying by remember { mutableStateOf(false) }
@@ -68,19 +68,22 @@ class MainActivity : ComponentActivity() {
         val handler = remember { Handler(Looper.getMainLooper()) }
 
         // Timer effect that updates every second
-        LaunchedEffect(isRecording.value) {
-            if (isRecording.value) {
+// Timer effect that updates every second for recording
+        LaunchedEffect(isRecording) {
+            if (isRecording) {
                 currentTimer = 0L // Reset the timer when recording starts
-
-                while (isRecording.value) {
+                while (isRecording && currentTimer < 60000) { // Ensure the timer stops at 60 seconds
                     delay(1000)
                     currentTimer += 1000
+                    if (currentTimer >= 60000) {
+                        isRecording = false
+                        break // Break out of the loop when 60 seconds are reached
+                    }
                 }
             } else {
                 currentTimer = 0L
             }
         }
-
         // Timer effect that updates every second
         LaunchedEffect(isAudioPlaying) {
             if (isAudioPlaying) {
@@ -142,13 +145,13 @@ class MainActivity : ComponentActivity() {
                             val elapsedTime = System.currentTimeMillis() - startRecordingTime
                             recordingProgress = elapsedTime / 60000f  // Max duration is 60 seconds
                         }, { startRecordingTime = it })
-                        isRecording.value = true
+                        isRecording = true
 
                     }else{
                         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }
                 },
-                enabled = !isRecording.value
+                enabled = !isRecording
 
             ) {
 //                Text(text = if (isRecording.value) "Stop Recording" else "Start Recording")
@@ -161,17 +164,17 @@ class MainActivity : ComponentActivity() {
             Button(
                 onClick = {
                     stopRecording(mediaRecorder, handler)
-                    isRecording.value = false
+                    isRecording = false
                 },
-                enabled = isRecording.value
+                enabled = isRecording
             ) {
                 Text("Stop Recording")
             }
 
-            /*Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Recording Progress Bar (Slider)
-            if (isRecording.value) {
+            if (isRecording) {
                 Slider(
                     value = recordingProgress,
                     onValueChange = {},
@@ -179,11 +182,11 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxWidth(),
                     valueRange = 0f..1f
                 )
-            }*/
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             // Waveform Visualization
-            if (isRecording.value || isAudioPlaying) {
+            if (isRecording || isAudioPlaying) {
                 WaveformVisualizer(audioSamples)
             }
 
@@ -221,12 +224,12 @@ class MainActivity : ComponentActivity() {
                                 duration = total
                             }, audioSamples, isAudioPlayingDone = {
                                 isAudioPlaying = false
-//                                stopPlaying(mediaPlayer, handler) ///
+                                stopPlaying(mediaPlayer, handler) ///
                             })
                         isAudioPlaying = true
                     }
                 },
-                enabled = audioFilePath.value != null && !isRecording.value
+                enabled = audioFilePath.value != null && !isRecording
             ) {
                 Text(if (isAudioPlaying) "Stop Playing" else "Play Recording")
             }
@@ -243,7 +246,7 @@ class MainActivity : ComponentActivity() {
                     isAudioPlaying = false
                     Toast.makeText(context, "Recording deleted", Toast.LENGTH_SHORT).show()
                 },
-                enabled = audioFilePath.value != null && !isRecording.value
+                enabled = audioFilePath.value != null && !isRecording
             ) {
                 Text("Delete Recording")
             }
