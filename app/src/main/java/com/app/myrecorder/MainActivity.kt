@@ -185,10 +185,13 @@ class MainActivity : ComponentActivity() {
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Waveform Visualization
-            if (isRecording || isAudioPlaying) {
-                WaveformVisualizer(audioSamples)
-            }
+//            // Waveform Visualization
+//            if (isRecording || isAudioPlaying) {
+//                WaveformVisualizer(audioSamples)
+//            }
+
+            // Waveform Display
+            Waveform(modifier = Modifier.height(50.dp))
 
             Spacer(modifier = Modifier.height(16.dp))
 
