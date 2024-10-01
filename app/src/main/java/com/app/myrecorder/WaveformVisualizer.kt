@@ -32,6 +32,7 @@ fun WaveformVisualizer(audioSamples: List<Float>) {
         drawPath(path, color = Color.Green)
     }
 }
+
 @Composable
 fun Waveform(modifier: Modifier = Modifier) {
     val waveformValues = remember { generateRandomWaveform() }

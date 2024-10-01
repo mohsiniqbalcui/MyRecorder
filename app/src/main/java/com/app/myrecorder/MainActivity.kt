@@ -33,14 +33,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.linc.audiowaveform.AudioWaveform
+import com.linc.audiowaveform.model.AmplitudeType
+import com.linc.audiowaveform.model.WaveformAlignment
 import kotlinx.coroutines.delay
+import linc.com.amplituda.Amplituda
+import linc.com.amplituda.Cache
+import linc.com.amplituda.callback.AmplitudaErrorListener
 import java.io.File
 import java.io.IOException
 
 class MainActivity : ComponentActivity() {
+    private var amplitudes: List<Int> = listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     private val context = this
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,9 +61,13 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun AudioRecorderWithPlayerAndProgress() {
+        var waveformProgress by remember { mutableStateOf(0F) }
+        var amplituda: Amplituda  = Amplituda(LocalContext.current)
+
         val context = LocalContext.current
         val audioFilePath = remember { mutableStateOf<String?>(null) }
         var isRecording by remember { mutableStateOf(false) }
+        var iswaveFormReady by remember { mutableStateOf(false) }
         val mediaRecorder = remember { mutableStateOf<MediaRecorder?>(null) }
         val mediaPlayer = remember { mutableStateOf<MediaPlayer?>(null) }
         var isAudioPlaying by remember { mutableStateOf(false) }
@@ -77,6 +91,8 @@ class MainActivity : ComponentActivity() {
                     currentTimer += 1000
                     if (currentTimer >= 60000) {
                         isRecording = false
+                        iswaveFormReady = true
+
                         break // Break out of the loop when 60 seconds are reached
                     }
                 }
@@ -112,7 +128,7 @@ class MainActivity : ComponentActivity() {
             onResult = { granted ->
                 if (!granted) {
                     Toast.makeText(context, "Permission denied", Toast.LENGTH_SHORT).show()
-                }else{
+                } else {
                     hasPermission.value = true
                 }
             }
@@ -125,6 +141,9 @@ class MainActivity : ComponentActivity() {
                 permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
+
+
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -140,14 +159,14 @@ class MainActivity : ComponentActivity() {
             // Record Button
             Button(
                 onClick = {
-                    if (hasPermission.value){
+                    if (hasPermission.value) {
                         startRecording(context, mediaRecorder, audioFilePath, handler, {
                             val elapsedTime = System.currentTimeMillis() - startRecordingTime
                             recordingProgress = elapsedTime / 60000f  // Max duration is 60 seconds
                         }, { startRecordingTime = it })
                         isRecording = true
 
-                    }else{
+                    } else {
                         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     }
                 },
@@ -165,6 +184,7 @@ class MainActivity : ComponentActivity() {
                 onClick = {
                     stopRecording(mediaRecorder, handler)
                     isRecording = false
+                    iswaveFormReady = true
                 },
                 enabled = isRecording
             ) {
@@ -190,10 +210,40 @@ class MainActivity : ComponentActivity() {
 //                WaveformVisualizer(audioSamples)
 //            }
 
-            // Waveform Display
-            Waveform(modifier = Modifier.height(50.dp))
+//            Waveform(modifier = Modifier.height(50.dp))
+//            DisplayAudioWaveform(audioSamples, context, handler, mediaPlayer, isAudioPlaying, waveformProgress, amplituda)
+//            DisplayAudioWaveform()
+
+            if (iswaveFormReady) {
+
+                amplitudes =
+                    amplituda.processAudio(audioFilePath.value, Cache.withParams(Cache.REFRESH))
+                        .get(AmplitudaErrorListener {
+                            it.printStackTrace()
+                        })
+                        .amplitudesAsList()
+
+                AudioWaveform(
+                    modifier = Modifier.fillMaxWidth(),
+                    // Spike DrawStyle: Fill or Stroke
+                    style = Fill,
+                    waveformAlignment = WaveformAlignment.Center,
+                    amplitudeType = AmplitudeType.Avg,
+                    // Colors could be updated with Brush API
+                    progressBrush = SolidColor(Color.Magenta),
+                    waveformBrush = SolidColor(Color.LightGray),
+                    spikeWidth = 4.dp,
+                    spikePadding = 2.dp,
+                    spikeRadius = 4.dp,
+                    progress = recordingProgress,
+                    amplitudes = amplitudes,
+                    onProgressChange = { recordingProgress = it },
+                    onProgressChangeFinished = {}
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
+
 
             // Playback Progress Bar (Slider)
             if (duration > 0f) {
@@ -241,13 +291,13 @@ class MainActivity : ComponentActivity() {
             // Delete Button to delete the recording
             Button(
                 onClick = {
+                    iswaveFormReady = false
                     deleteRecording(audioFilePath, context)
                     // Reset progress and states after deleting
                     currentProgress = 0f
                     recordingProgress = 0f
                     duration = 0f
                     isAudioPlaying = false
-                    Toast.makeText(context, "Recording deleted", Toast.LENGTH_SHORT).show()
                 },
                 enabled = audioFilePath.value != null && !isRecording
             ) {
@@ -341,7 +391,9 @@ class MainActivity : ComponentActivity() {
                             // Simulate audio samples for waveform visualization
                             audioSamples.clear()
                             for (i in 0 until 100) {
-                                audioSamples.add((Math.random().toFloat() - 0.5f) * 2) // Random amplitude
+                                audioSamples.add(
+                                    (Math.random().toFloat() - 0.5f) * 2
+                                ) // Random amplitude
                             }
 
                             handler.postDelayed(this, 100)  // Update every 100ms
@@ -352,7 +404,7 @@ class MainActivity : ComponentActivity() {
 //                Toast.makeText(context, "Playing audio", Toast.LENGTH_SHORT).show()
 
                 setOnCompletionListener {
-                    Toast.makeText(context, "Playback completed", Toast.LENGTH_SHORT).show()
+//                    Toast.makeText(context, "Playback completed", Toast.LENGTH_SHORT).show()
                     isAudioPlayingDone(false)
                 }
             } catch (e: IOException) {
@@ -369,7 +421,7 @@ class MainActivity : ComponentActivity() {
                 stop()
                 reset()
                 release()
-                Toast.makeText(context, "Playback stopped", Toast.LENGTH_SHORT).show()
+//                Toast.makeText(context, "Playback stopped", Toast.LENGTH_SHORT).show()
             }
         }
         mediaPlayer.value = null
@@ -384,7 +436,7 @@ class MainActivity : ComponentActivity() {
                 val deleted = file.delete()
                 if (deleted) {
                     audioFilePath.value = null
-                    Toast.makeText(context, "Recording deleted", Toast.LENGTH_SHORT).show()
+//                    Toast.makeText(context, "Recording deleted", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(context, "Failed to delete recording", Toast.LENGTH_SHORT).show()
                 }
