@@ -61,8 +61,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun AudioRecorderWithPlayerAndProgress() {
-        var waveformProgress by remember { mutableStateOf(0F) }
-        var amplituda: Amplituda  = Amplituda(LocalContext.current)
+        var amplituda: Amplituda = Amplituda(LocalContext.current)
 
         val context = LocalContext.current
         val audioFilePath = remember { mutableStateOf<String?>(null) }
@@ -160,6 +159,7 @@ class MainActivity : ComponentActivity() {
             Button(
                 onClick = {
                     if (hasPermission.value) {
+                        iswaveFormReady = false
                         startRecording(context, mediaRecorder, audioFilePath, handler, {
                             val elapsedTime = System.currentTimeMillis() - startRecordingTime
                             recordingProgress = elapsedTime / 60000f  // Max duration is 60 seconds
@@ -235,9 +235,13 @@ class MainActivity : ComponentActivity() {
                     spikeWidth = 4.dp,
                     spikePadding = 2.dp,
                     spikeRadius = 4.dp,
-                    progress = recordingProgress,
+                    progress = currentProgress,
                     amplitudes = amplitudes,
-                    onProgressChange = { recordingProgress = it },
+                    onProgressChange = {
+                        currentProgress = it
+                        mediaPlayer.value?.seekTo((it * duration).toInt())  // Seek to new position
+
+                    },
                     onProgressChangeFinished = {}
                 )
             }
@@ -264,7 +268,8 @@ class MainActivity : ComponentActivity() {
             Button(
                 onClick = {
                     if (isAudioPlaying) {
-                        stopPlaying(mediaPlayer, handler)
+//                        stopPlaying(mediaPlayer, handler)
+                        pausePlaying(mediaPlayer)
                         isAudioPlaying = false
                     } else {
                         startPlaying(
@@ -284,7 +289,7 @@ class MainActivity : ComponentActivity() {
                 },
                 enabled = audioFilePath.value != null && !isRecording
             ) {
-                Text(if (isAudioPlaying) "Stop Playing" else "Play Recording")
+                Text(if (isAudioPlaying) "pause Playing" else "Play Recording")
             }
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -292,7 +297,10 @@ class MainActivity : ComponentActivity() {
             Button(
                 onClick = {
                     iswaveFormReady = false
+                    stopPlaying(mediaPlayer, handler)
+
                     deleteRecording(audioFilePath, context)
+
                     // Reset progress and states after deleting
                     currentProgress = 0f
                     recordingProgress = 0f
@@ -307,7 +315,7 @@ class MainActivity : ComponentActivity() {
     }
 
     // Function to start recording audio
-    fun startRecording(
+    private fun startRecording(
         context: Context,
         mediaRecorder: MutableState<MediaRecorder?>,
         audioFilePath: MutableState<String?>,
@@ -326,7 +334,7 @@ class MainActivity : ComponentActivity() {
             setAudioSamplingRate(44100)      // 44.1 kHz sample rate
             setOutputFile(fileName)
 
-            setMaxDuration(60000)  // 60 seconds
+            setMaxDuration(12*60000)  // 60 seconds
 
             try {
                 prepare()
@@ -351,7 +359,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun stopRecording(mediaRecorder: MutableState<MediaRecorder?>, handler: Handler) {
+//    fun updateProgress(progress: Float) {
+//        val position = currentLocalAudio?.duration?.times(progress)?.toLong() ?: 0L
+//        playbackManager.seekTo(position)
+//        uiState = uiState.copy(progress = progress)
+//    }
+
+    private fun stopRecording(mediaRecorder: MutableState<MediaRecorder?>, handler: Handler) {
         mediaRecorder.value?.apply {
             stop()
             release()
@@ -362,7 +376,7 @@ class MainActivity : ComponentActivity() {
     }
 
     // Function to start playing audio and update playback progress
-    fun startPlaying(
+    private fun startPlaying(
         context: Context,
         mediaPlayer: MutableState<MediaPlayer?>,
         filePath: String?,
@@ -415,7 +429,7 @@ class MainActivity : ComponentActivity() {
     }
 
     // Function to stop playing audio and stop progress updates
-    fun stopPlaying(mediaPlayer: MutableState<MediaPlayer?>, handler: Handler) {
+    private fun stopPlaying(mediaPlayer: MutableState<MediaPlayer?>, handler: Handler) {
         mediaPlayer.value?.apply {
             if (isPlaying) {
                 stop()
@@ -428,10 +442,21 @@ class MainActivity : ComponentActivity() {
         handler.removeCallbacksAndMessages(null)  // Stop updating the playback progress
     }
 
+    // Function to stop playing audio and stop progress updates
+    private fun pausePlaying(mediaPlayer: MutableState<MediaPlayer?>) {
+        mediaPlayer.value?.apply {
+            if (isPlaying) {
+                pause()
+//                Toast.makeText(context, "Playback stopped", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     // Function to delete the recording
-    fun deleteRecording(audioFilePath: MutableState<String?>, context: Context) {
+    private fun deleteRecording(audioFilePath: MutableState<String?>, context: Context) {
         audioFilePath.value?.let {
             val file = File(it)
+
             if (file.exists()) {
                 val deleted = file.delete()
                 if (deleted) {
