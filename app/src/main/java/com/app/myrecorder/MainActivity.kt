@@ -338,41 +338,47 @@ class MainActivity : ComponentActivity() {
     ) {
         if (filePath == null) return
 
-        mediaPlayer.value = MediaPlayer().apply {
-            try {
-                setDataSource(filePath)
+        if (mediaPlayer.value == null) {
+            mediaPlayer.value = MediaPlayer().apply {
+                try {
+                    setDataSource(filePath)
 
-                if (!isPlaying && currentPlayerProgress > 0) {
-                    Log.e("TAG", "onClick resume: $currentPlayerProgress")
-                    mediaPlayer.value?.seekTo((currentPlayerProgress))  // Seek to new position
-                } else {
+//                    if (!isPlaying && currentPlayerProgress > 0) {
+//                        Log.e("TAG", "onClick resume: $currentPlayerProgress")
+//                        mediaPlayer.value?.seekTo((currentPlayerProgress))  // Seek to new position
+//                    } else {
                     prepare()
-                    mediaPlayer.value?.seekTo(0)  // Seek to new position
+//                        mediaPlayer.value?.seekTo(0)  // Seek to new position
 
-                }
-                start()
+//                    }
+                    start()
 
-                val durationMs = duration.toFloat()
+                    val durationMs = duration.toFloat()
 
-                // Periodically update the playback progress
-                handler.post(object : Runnable {
-                    override fun run() {
-                        if (isPlaying) {
-                            val currentPosition = currentPlayerProgress.toFloat()
-                            onPlaybackProgress(currentPosition, durationMs)
+                    // Periodically update the playback progress
+                    handler.post(object : Runnable {
+                        override fun run() {
+                            if (isPlaying) {
+                                val currentPosition = currentPlayerProgress.toFloat()
+                                onPlaybackProgress(currentPosition, durationMs)
 
-                            handler.postDelayed(this, 100)  // Update every 100ms
+                                handler.postDelayed(this, 100)  // Update every 100ms
+                            }
                         }
-                    }
-                })
+                    })
 
-                setOnCompletionListener {
-                    isAudioPlayingDone(false)
+                    setOnCompletionListener {
+                        isAudioPlayingDone(false)
+                    }
+                } catch (e: IOException) {
+                    Toast.makeText(context, "Playback failed", Toast.LENGTH_SHORT).show()
+                    e.printStackTrace()
                 }
-            } catch (e: IOException) {
-                Toast.makeText(context, "Playback failed", Toast.LENGTH_SHORT).show()
-                e.printStackTrace()
             }
+
+        } else {
+            mediaPlayer.value?.start()
+
         }
     }
 

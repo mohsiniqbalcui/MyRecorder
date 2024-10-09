@@ -59,7 +59,6 @@ import java.io.IOException
         mediaRecorder.value?.apply {
             stop()
             release()
-//            Toast.makeText(context, "Recording stopped", Toast.LENGTH_SHORT).show()
         }
         mediaRecorder.value = null
         handler.removeCallbacksAndMessages(null)  // Stop updating the recording progress
